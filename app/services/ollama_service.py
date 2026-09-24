@@ -40,7 +40,7 @@ class OllamaService:
             "options": {"temperature": 0.3}
         }
 
-        async with httpx.AsyncClient(timeout=1.0 if detection.type != "RETURN_TO_NORMAL" else 30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             try:
                 response = await client.post(self.url, json=payload)
                 response.raise_for_status()

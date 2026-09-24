@@ -1,0 +1,25 @@
+services:
+  # FastAPI Application Service
+  web:
+    build: .
+    container_name: aqi_agent_web
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  # Local Ollama Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aqi_agent_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_storage:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_storage:
