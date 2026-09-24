@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proactive AQI Insight Agent Dashboard</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header & City Selector -->
+        <header class="mb-8 border-b border-gray-800 pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-400">Proactive AQI Insight Agent</h1>
+                <p class="text-gray-400 text-sm mt-1">Real-time threshold tracking & anomaly detection</p>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <!-- Multi-City Selector -->
+                <div>
+                    <label for="city-select" class="block text-xs text-gray-400 mb-1 font-semibold uppercase">Select City</label>
+                    <select id="city-select" onchange="fetchLogs()" class="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+                        <option value="2178" selected>Los Angeles (user_1)</option>
+                        <option value="1044">London (user_2)</option>
+                        <option value="8023">Delhi (user_3)</option>
+                    </select>
+                </div>
+
+                <button id="trigger-btn" onclick="triggerCycle()" class="mt-5 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg transition shadow-md">
+                    Trigger Hourly Cycle
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Left Panel: Live Metadata & Active Thresholds -->
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
+                <h2 class="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2 flex justify-between items-center">
+                    <span>Active AQI Thresholds</span>
+                    <span id="selected-city-label" class="text-xs font-normal text-blue-400 bg-blue-950 px-2 py-0.5 rounded border border-blue-800">Los Angeles</span>
+                </h2>
+                
+                        
+                <!-- Injection Mock Section -->
+                <div class="mt-6 pt-4 border-t border-gray-700">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2">Inject Custom AQI Reading</h3>
+                    <div class="flex gap-2">
+                        <input id="mock-value" type="number" placeholder="e.g. 150.0" class="bg-gray-900 border border-gray-700 text-white rounded px-3 py-1 text-sm w-full focus:outline-none focus:border-blue-500">
+                        <button onclick="injectReading()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-3 py-1 rounded transition">Inject</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Panel: Audit Logs -->
+        <div class="mt-8 bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
+            <h2 class="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2">Real-Time Audit & Trigger Logs</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-gray-300">
+                    <thead class="bg-gray-900 text-gray-400 uppercase text-xs">
+                        <tr>
+                            <th class="px-4 py-3">Timestamp</th>
+                            <th class="px-4 py-3">City</th>
+                            <th class="px-4 py-3">AQI</th>
+                            <th class="px-4 py-3">Detection Type</th>
+                            <th class="px-4 py-3">Status</th>
+                            <th class="px-4 py-3">Generated LLM Notification</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-table" class="divide-y divide-gray-700">
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-gray-500">Loading audit logs...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Logic & Chart Initialization -->
+    <script>
+        let chartInstance = null;
+
+        const cityMap = {
+            "2178": "Los Angeles",
+            "1044": "London",
+            "8023": "Delhi"
+        };
+
+        function initChart() {
+            const ctx = document.getElementById('aqiChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Current AQI', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.2 },
+                        { label: 'Baseline Avg', data: [], borderColor: '#9ca3af', borderDash: [5, 5], fill: false },
+                        { label: 'Spike Limit', data: [], borderColor: '#ef4444', borderDash: [2, 2], fill: false },
+                        { label: 'Drop Limit', data: [], borderColor: '#10b981', borderDash: [2, 2], fill: false }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: '#374151' }, ticks: { color: '#9ca3af' } },
+                        y: { grid: { color: '#374151' }, ticks: { color: '#9ca3af' }, beginAtZero: true }
+                    },
+                    plugins: { legend: { labels: { color: '#d1d5db' } } }
+                }
+            });
+        }
+
+        async function fetchLogs() {
+            try {
+                const selectedLocationId = parseInt(document.getElementById('city-select').value);
+                const selectedCityName = cityMap[selectedLocationId];
+                document.getElementById('selected-city-label').innerText = selectedCityName;
+
+                const res = await fetch('/api/logs');
+                const data = await res.json();
+                const logs = data.logs || [];
+
+                // Filter logs specifically for the selected city
+                const cityLogs = logs.filter(l => l.city === selectedCityName);
+
+                // Populate Audit Table
+                const tbody = document.getElementById('logs-table');
+                if (cityLogs.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-gray-500">No readings recorded yet for ${selectedCityName}.</td></tr>`;
+                } else {
+                    tbody.innerHTML = cityLogs.map(log => {
+                        let badgeColor = 'bg-gray-700 text-gray-300';
+                        if (log.status === 'FIRED') badgeColor = 'bg-red-900 text-red-200 border border-red-700';
+                        if (log.status === 'RATE_LIMITED') badgeColor = 'bg-yellow-900 text-yellow-200 border border-yellow-700';
+
+                        return `
+                            <tr class="hover:bg-gray-750 transition">
+                                <td class="px-4 py-3 text-xs text-gray-400">${new Date(log.timestamp).toLocaleTimeString()}</td>
+                                <td class="px-4 py-3 font-medium text-white">${log.city}</td>
+                                <td class="px-4 py-3 font-bold text-blue-400">${log.current_reading}</td>
+                                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-gray-900 border border-gray-700">${log.detection.type || 'NORMAL'}</span></td>
+                                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-semibold ${badgeColor}">${log.status}</span></td>
+                                <td class="px-4 py-3 text-xs text-gray-300 italic">${log.message || log.detection.reason}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+
+                // Update Cards and Chart using Latest Log for this city
+                if (cityLogs.length > 0) {
+                    const latest = cityLogs[0].detection;
+                    document.getElementById('current-val').innerText = latest.current;
+                    document.getElementById('baseline-avg').innerText = latest.baseline_avg;
+                    document.getElementById('spike-thresh').innerText = `${latest.spike_threshold} AQI`;
+                    document.getElementById('drop-thresh').innerText = `${latest.drop_threshold} AQI`;
+                    document.getElementById('sustained-thresh').innerText = `\u00B1${latest.sustained_threshold} AQI`;
+
+                    const reversedLogs = [...cityLogs].slice(0, 15).reverse();
+                    chartInstance.data.labels = reversedLogs.map(l => new Date(l.timestamp).toLocaleTimeString());
+                    chartInstance.data.datasets[0].data = reversedLogs.map(l => l.current_reading);
+                    chartInstance.data.datasets[1].data = reversedLogs.map(l => l.detection.baseline_avg);
+                    chartInstance.data.datasets[2].data = reversedLogs.map(l => l.detection.spike_threshold);
+                    chartInstance.data.datasets[3].data = reversedLogs.map(l => l.detection.drop_threshold);
+                    chartInstance.update();
+                } else {
+                    document.getElementById('current-val').innerText = '--';
+                    document.getElementById('baseline-avg').innerText = '--';
+                    document.getElementById('spike-thresh').innerText = '-- AQI';
+                    document.getElementById('drop-thresh').innerText = '-- AQI';
+                    document.getElementById('sustained-thresh').innerText = '\u00B1-- AQI';
+                    chartInstance.data.labels = [];
+                    chartInstance.data.datasets.forEach(d => d.data = []);
+                    chartInstance.update();
+                }
+
+            } catch (err) {
+                console.error("Error updating dashboard:", err);
+            }
+        }
+
+        async function triggerCycle() {
+            await fetch('/api/trigger-cycle', { method: 'POST' });
+            fetchLogs();
+        }
+
+        async function injectReading() {
+            const selectedLocationId = parseInt(document.getElementById('city-select').value);
+            const val = parseFloat(document.getElementById('mock-value').value);
+            if (isNaN(val)) return alert('Please enter a valid AQI number.');
+
+            await fetch('/api/mock-reading', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ location_id: selectedLocationId, value: val })
+            });
+            document.getElementById('mock-value').value = '';
+            fetchLogs();
+        }
+
+        window.onload = () => {
+            initChart();
+            fetchLogs();
+            setInterval(fetchLogs, 10000);
+        };
+    </script>
+</body>
+</html>
