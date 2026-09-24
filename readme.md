@@ -1,8 +1,4 @@
-Here is a clean, comprehensive **`README.md`** tailored to your project architecture, Docker setup, and local LLM workflow. You can drop this directly into your repository root.
 
----
-
-```markdown
 # 🌍 Proactive AQI Insight Agent
 
 An intelligent, real-time Air Quality Index (AQI) monitoring and anomaly detection agent powered by **FastAPI** and local LLM notifications via **Ollama**.
@@ -158,6 +154,3 @@ Key parameters can be configured via environment variables in `docker-compose.ym
 | `OLLAMA_HOST` | `http://ollama:11434` | Base URL for the Ollama container endpoint |
 | `OLLAMA_MODEL` | `mistral` | Target model name executed by Ollama |
 
-```
-
-```
